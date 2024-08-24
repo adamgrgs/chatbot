@@ -1,28 +1,29 @@
 import streamlit as st
 import openai
 from llama_index.llms.openai import OpenAI
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings
+from llama_index.core import VectorStoreIndex, Document, Settings
 
 import os
 import PyPDF2
-from langchain.docstore.document import Document
 
-def read_pdf_files(directory):
-    docs = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith('.pdf'):
-                pdf_file_path = os.path.join(root, file)
-                with open(pdf_file_path, 'rb') as f:
-                    pdf_reader = PyPDF2.PdfFileReader(f)
-                    text = ''
-                    for page in range(pdf_reader.numPages):
-                        text += pdf_reader.getPage(page).extractText()
-                    doc = Document(text, metadata={"filename": file})
-                    docs.append(doc)
-    return docs
+class SimplePdfDirectoryReader:
+    def __init__(self, directory: str):
+        self.directory = directory
 
-docs = read_pdf_files('./data')
+    def read(self) -> list[Document]:
+        docs = []
+        for root, dirs, files in os.walk(self.directory):
+            for file in files:
+                if file.endswith('.pdf'):
+                    pdf_file_path = os.path.join(root, file)
+                    with open(pdf_file_path, 'rb') as f:
+                        pdf_reader = PyPDF2.PdfReader(f)
+                        text = ''
+                        for page in range(len(pdf_reader.pages)):
+                            text += pdf_reader.pages[page].extract_text()
+                        doc = Document(content=text, metadata={"filename": file})
+                        docs.append(doc)
+        return docs
 
 st.set_page_config(page_title="Chat with the Streamlit docs, powered by LlamaIndex", page_icon="🦙", layout="centered", initial_sidebar_state="auto", menu_items=None)
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -33,23 +34,18 @@ if "messages" not in st.session_state.keys():  # Initialize the chat messages hi
     st.session_state.messages = [
         {
             "role": "assistant",
-            "content": "Ask me a question about Streamlit's open-source Python library!",
+            "content": "Ask me a question about the books in library!",
         }
     ]
 
 @st.cache_resource(show_spinner=False)
 def load_data():
-    docs = read_pdf_files('./data')
+    reader = SimplePdfDirectoryReader('./data')
+    docs = reader.read()
     Settings.llm = OpenAI(
         model="gpt-3.5-turbo",
         temperature=0.2,
-        system_prompt="""You are an expert on 
-        the Streamlit Python library and your 
-        job is to answer technical questions. 
-        Assume that all questions are related 
-        to the Streamlit Python library. Keep 
-        your answers technical and based on 
-        facts – do not hallucinate features.""",
+        system_prompt="""You have read the books attached. answer questions accordingly""",
     )
     index = VectorStoreIndex.from_documents(docs)
     return index
