@@ -45,7 +45,7 @@ def load_data():
     Settings.llm = OpenAI(
         model="gpt-3.5-turbo",
         temperature=0.2,
-        system_prompt="""You have read the books attached. answer questions accordingly""",
+        system_prompt="""You have read the books attached. answer questions accordingly. With every answer provide a reference from the book you used""",
     )
     index = VectorStoreIndex.from_documents(docs)
     return index
